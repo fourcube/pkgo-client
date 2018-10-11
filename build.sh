@@ -1,6 +1,7 @@
 #/usr/bin/env bash
 CONFIGURATIONS=(
     linux,386 \
+    darwin,386 \
 )
 
 version=`cat VERSION`

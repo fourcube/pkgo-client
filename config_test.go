@@ -6,20 +6,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConfigValidateMissingPidFile(t *testing.T) {
-	c := PkgoConfig{}
-
-	valid, err := c.Validate()
-	assert.NotNil(t, err)
-	assert.False(t, valid)
-}
-
 func TestConfigValidateMissingExecutable(t *testing.T) {
 	c := PkgoConfig{
+		PidFile:        "/tmp/pid",
+		WorkingDir:     "/tmp",
 		ExecutablePath: "/tmp/foo",
 	}
 
 	valid, err := c.Validate()
-	assert.NotNil(t, err)
+	assert.Equal(t, ErrExecutableDoesNotExist, err)
+	assert.False(t, valid)
+}
+
+func TestConfigValidateMissingWorkingDir(t *testing.T) {
+	c := PkgoConfig{
+		PidFile:        "/tmp/pid",
+		ExecutablePath: "/tmp/foo",
+	}
+
+	valid, err := c.Validate()
+	assert.Equal(t, ErrMissingWorkingDir, err)
 	assert.False(t, valid)
 }

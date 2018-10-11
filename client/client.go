@@ -8,23 +8,33 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/fourcube/pkgo-client/xlog"
+)
+
+const DefaultPackageDirectory = "/tmp/pkgo"
+
+var (
+	ErrNoUpdates = errors.New("no updates available")
 )
 
 type Package struct {
 	Name           string
 	PublicKey      string
 	CurrentVersion string
+	WorkingDir     string
 	// Will be replaced during update
 	ExecutablePath string
 	LicenseKey     string
+	RepositoryUrl  string
 }
 
 func Update(pkg Package) error {
@@ -33,20 +43,19 @@ func Update(pkg Package) error {
 		return err
 	}
 
-	pkgMeta, err := getMeta(pkg.Name, "current", pkg.LicenseKey)
+	pkgMeta, err := getMeta(pkg.RepositoryUrl, pkg.Name, "current", pkg.LicenseKey)
 	if err != nil || pkgMeta == nil {
 		return err
 	}
-	xlog.Print("Updating to %v", pkgMeta.Version)
+	xlog.Print("updating to %v", pkgMeta.Version)
 
 	if pkgMeta.Version == pkg.CurrentVersion {
 		xlog.Print("Version already up to date.")
-		return nil
+		return ErrNoUpdates
 	}
 
-	fileBytes, err := download(pkg.Name, "current", pkg.LicenseKey)
+	fileBytes, err := download(pkg.RepositoryUrl, pkg.Name, "current", pkg.LicenseKey)
 	if err != nil {
-		// os.Remove(newExecutablePath)
 		return err
 	}
 
@@ -85,6 +94,10 @@ func Update(pkg Package) error {
 		return fmt.Errorf("signature does not match file contents")
 	}
 
+	if pkgMeta.Unpack {
+		return extractPackage(pkg, pkgMeta, fileBytes)
+	}
+
 	// Save Executable
 	newExecutablePath := fmt.Sprintf("%s-tmp", pkg.ExecutablePath)
 	oldExecutablePath := pkg.ExecutablePath
@@ -112,9 +125,39 @@ func Update(pkg Package) error {
 	return nil
 }
 
-func getMeta(pkgName string, version string, licenseKey string) (*PackageMeta, error) {
+func extractPackage(pkg Package, pkgMeta *PackageMeta, fileBytes []byte) error {
+	os.MkdirAll(DefaultPackageDirectory, 0755)
+	fileName := fmt.Sprintf("%s-%s_", pkg.Name, pkgMeta.Version)
+	tmpFile, err := ioutil.TempFile(DefaultPackageDirectory, fileName)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+	}()
+
+	xlog.Print("downloaded archive to %s", tmpFile.Name())
+
+	if _, err := tmpFile.Write(fileBytes); err != nil {
+		return err
+	}
+
+	unpackCmd := exec.Command("tar", "-xvzf", tmpFile.Name(), "-C", pkg.WorkingDir)
+	unpackCmd.Dir = pkg.WorkingDir
+
+	out, err := unpackCmd.CombinedOutput()
+	if err != nil {
+		xlog.Print(string(out))
+		return err
+	}
+
+	return nil
+}
+
+func getMeta(baseUrl string, pkgName string, version string, licenseKey string) (*PackageMeta, error) {
 	client := &http.Client{}
-	url := fmt.Sprintf("http://localhost:8000/api/packages/%s", pkgName)
+	url := fmt.Sprintf("%s/api/packages/%s", baseUrl, pkgName)
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header = map[string][]string{
 		"X-License": {licenseKey},
@@ -144,9 +187,9 @@ func getMeta(pkgName string, version string, licenseKey string) (*PackageMeta, e
 	return pkgMeta, nil
 }
 
-func download(pkgName string, version string, licenseKey string) ([]byte, error) {
+func download(baseUrl string, pkgName string, version string, licenseKey string) ([]byte, error) {
 	client := &http.Client{}
-	url := fmt.Sprintf("http://localhost:8000/api/packages/%s/download", pkgName)
+	url := fmt.Sprintf("%s/api/packages/%s/download", baseUrl, pkgName)
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header = map[string][]string{
 		"X-License": {licenseKey},

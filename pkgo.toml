@@ -1,4 +1,12 @@
 name = "openiban"
-executable_path = "/tmp/goiban-service"
-pid_file = "/tmp/openiban.pid"
-license_key = "deadbeef"
+repository = "http://localhost:8080" # Required
+working_dir = "/tmp/goiban" # Required
+executable_path = "/tmp/goiban/goiban-service/goiban-service" # Required
+
+pid_file = "/tmp/openiban.pid" # Optional
+license_key = "deadbeef" # Optional
+
+after_update = [ # Optional
+    "sudo systemctl restart openiban@8080",
+    "sudo service restart openiban@8081",
+]
