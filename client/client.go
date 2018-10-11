@@ -126,7 +126,7 @@ func Update(pkg Package) error {
 }
 
 func extractPackage(pkg Package, pkgMeta *PackageMeta, fileBytes []byte) error {
-	os.MkdirAll(DefaultPackageDirectory, 0755)
+	os.MkdirAll(DefaultPackageDirectory, 0777)
 	fileName := fmt.Sprintf("%s-%s_", pkg.Name, pkgMeta.Version)
 	tmpFile, err := ioutil.TempFile(DefaultPackageDirectory, fileName)
 	if err != nil {
