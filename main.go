@@ -69,9 +69,9 @@ func main() {
 	xlog.Print("current version: %s", version)
 
 	err = client.Update(client.Package{
-		Name:           "openiban",
 		PublicKey:      publicKey,
 		CurrentVersion: version,
+		Name:           config.Name,
 		RepositoryUrl:  config.Repository,
 		WorkingDir:     config.WorkingDir,
 		ExecutablePath: config.ExecutablePath,
