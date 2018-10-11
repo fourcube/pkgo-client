@@ -1,0 +1,4 @@
+name = "openiban"
+executable_path = "/tmp/goiban-service"
+pid_file = "/tmp/openiban.pid"
+license_key = "deadbeef"
